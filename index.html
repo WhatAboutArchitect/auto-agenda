@@ -33,6 +33,7 @@ button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(
 #ov[hidden]{display:none}
 .mod{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:14px;padding:16px 16px 12px;width:100%;max-width:520px;max-height:85vh;overflow:auto;font-size:14px;position:relative}
 .mod .x{position:absolute;top:8px;right:8px;padding:3px 8px}.mod #mb div{margin:4px 0}.mod #mb{padding-right:28px}
+#lg{margin-top:6px}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 5px 0 12px}#lg .dot:first-child{margin-left:0}
 #map{height:240px;border-radius:8px;margin-top:8px}.dm{font-size:12px;padding:2px 8px;margin-left:8px}
 .it.tv{background:transparent;border:1px dashed var(--bd);color:var(--mu);font-size:13px;cursor:default}
 .it.sel{outline:2px solid var(--ac)}.it.rel{outline:2px dashed var(--ac)}
@@ -58,15 +59,14 @@ button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(
 <label>Duur (min, 0 = geen)<input type="number" id="ld" value="45" min="0"></label>
 <label>Kantoor (naam of adres)<input id="office" placeholder="Kantoorstraat 1, Mechelen" style="width:230px"></label>
 <label>Coördinaten kantoor (optioneel)<input id="base" placeholder="51.0259,4.4776" style="width:160px"></label></div>
-<label style="margin-top:10px">Handmatige reistijden (optioneel, gaan voor op de berekening; één per regel, enkele rit): tekst in locatie = minuten
-<textarea id="rules" rows="4" placeholder="Antwerpen = 35&#10;Gent = 60&#10;Gent > Antwerpen = 45 (rit tussen twee plaatsen)"></textarea></label>
-<div class="mu" style="margin-top:6px">Locaties worden via OpenStreetMap (Nominatim) opgezocht en de rijtijden tussen alle plaatsen met OSRM berekend (auto, zonder file). Vertrek en terugkeer gebeuren vanuit je kantoor; tussen twee plaatsen rijd je rechtstreeks. Mislukt het opzoeken, dan gelden je handmatige reistijden, de schatting op coördinaten of de standaard reistijd. Afspraken zonder locatie krijgen geen reistijd.</div></div>
+
+<div class="mu" style="margin-top:6px">Locaties worden via OpenStreetMap (Nominatim) opgezocht en de rijtijden tussen alle plaatsen met OSRM berekend (auto, zonder file). Vertrek en terugkeer gebeuren vanuit je kantoor; tussen twee plaatsen rijd je rechtstreeks. Lukt de berekening of het opzoeken van een adres niet, dan wordt de standaardreistijd gebruikt. Afspraken zonder locatie krijgen geen reistijd.</div></div>
 <div class="card"><h2>4. Werkuren en plannen</h2><div class="row">
 <label>Vanaf<input type="date" id="from"></label>
 <label>Dagen<input type="number" id="days" value="14" min="1" max="90"></label>
 <label>Start<input type="time" id="ws" value="08:30"></label>
 <label>Einde<input type="time" id="we" value="17:30"></label>
-<label>Reistijd als berekening mislukt (min)<input type="number" id="buf" value="20" min="0"></label>
+<label>Standaardreistijd (min), als berekening mislukt<input type="number" id="buf" value="20" min="0"></label>
 <label>Min. blok (min)<input type="number" id="minc" value="30" min="5"></label>
 <label><span>Weekend</span><input type="checkbox" id="wk"></label>
 <button class="p" id="go">Plan in</button></div></div>
@@ -164,24 +164,10 @@ function travel(e,def){
  if(!e.loc&&!e.geo)return 0;
  const loc=(e.loc||'').toLowerCase(),of=$('office').value.trim().toLowerCase();
  if(of&&loc.includes(of))return 0;                      // afspraak op kantoor zelf
- for(const r of $('rules').value.split('\n')){const[k,v]=r.split('=');
-  if(v&&k.trim()&&loc.includes(k.trim().toLowerCase())&&parseFloat(v)>0)return Math.round(parseFloat(v));}
- const b=$('base').value.split(',').map(parseFloat);
- const m=lk(OF,e.geo);if(m!=null)return m;                  // berekende rit kantoor → plaats
- if(e.geo&&b.length===2&&!b.some(isNaN))return est(b,e.geo);
- return def;}
-function est(a,c){                                      // hemelsbreed x 1,3, gemiddeld 50 km/u
- const rad=x=>x*Math.PI/180,dA=rad(c[0]-a[0]),dO=rad(c[1]-a[1]);
- const h=Math.sin(dA/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(c[0]))*Math.sin(dO/2)**2;
- return Math.max(10,Math.round(2*6371*Math.asin(Math.sqrt(h))*1.3/50*60/5)*5);}
+ const m=lk(OF,e.geo);return m!=null?m:def;}            // berekend, anders de standaardreistijd
 function hop(a,b,def){                                  // rechtstreekse rit van plaats a naar plaats b
- const la=a.loc.toLowerCase(),lb=b.loc.toLowerCase();
- for(const r of $('rules').value.split('\n')){const[k,v]=r.split('=');if(!v||!k.includes('>'))continue;
-  const[x,y]=k.split('>').map(s=>s.trim().toLowerCase());
-  if(x&&y&&((la.includes(x)&&lb.includes(y))||(la.includes(y)&&lb.includes(x)))&&parseFloat(v)>0)return Math.round(parseFloat(v));}
- const m=lk(a.geo,b.geo);if(m!=null)return m;                  // berekende rit a → b
- const via=a.tr+b.tr;                                   // nooit meer dan via kantoor
- return Math.min(via,a.geo&&b.geo?est(a.geo,b.geo):def);}
+ const m=lk(a.geo,b.geo);if(m!=null)return m;
+ return Math.min(a.tr+b.tr,def);}                       // anders standaardreistijd, nooit meer dan via kantoor
 
 // ---------- OpenStreetMap: geocoding, reistijden, kaart ----------
 let G={},OF=null,M={},map=null;
@@ -218,10 +204,12 @@ function closeMap(){if(map){map.remove();map=null}}
 function showMap(pts){
  closeMap();pts=(pts||[]).filter(Boolean);
  if(!$('map')||!pts.length||typeof maplibregl==='undefined')return;
+ const lg=$('lg'),two=new Set(pts.map(key)).size>1,isO=OF&&key(pts[0])===key(OF),D=(c,x)=>'<span class="dot" style="background:'+c+'"></span>'+x;
+ if(lg)lg.innerHTML=two?D('#2f6fed','Start / kantoor')+D('#d9480f','Locatie')+'<span class="dot" style="background:#2f6fed;border-radius:2px;height:4px;width:16px"></span>Route':(isO?D('#2f6fed','Kantoor'):D('#d9480f','Locatie'));
  map=new maplibregl.Map({container:'map',style:STY,center:ll(pts[pts.length-1]),zoom:13});
  map.addControl(new maplibregl.NavigationControl({showCompass:false}));
  const seen=new Set();
- pts.forEach((g,i)=>{if(seen.has(key(g)))return;seen.add(key(g));new maplibregl.Marker({color:i?'#d9480f':'#2f6fed'}).setLngLat(ll(g)).addTo(map)});
+ pts.forEach((g,i)=>{if(seen.has(key(g)))return;seen.add(key(g));new maplibregl.Marker({color:(OF&&key(g)===key(OF))||(i===0&&pts.length>1)?'#2f6fed':'#d9480f'}).setLngLat(ll(g)).addTo(map)});
  if(seen.size<2)return;
  map.on('load',async()=>{const r=await route(pts);if(!r||!map)return;
   map.addSource('r',{type:'geojson',data:{type:'Feature',geometry:r.geometry}});
@@ -229,11 +217,15 @@ function showMap(pts){
   const c=r.geometry.coordinates;map.fitBounds(c.reduce((B,q)=>B.extend(q),new maplibregl.LngLatBounds(c[0],c[0])),{padding:40,duration:0});
   $('ri').textContent='Route: '+Math.round(r.distance/100)/10+' km · '+Math.round(r.duration/60)+' min rijden (zonder file)';});}
 function openDay(k){
- const it=(dayMap[k]||[]).filter(x=>x.geo&&!(x.task&&doneT[x.tid])).sort((a,b)=>a.start-b.start),pts=OF?[OF]:[];
+ const day=dayMap[k]||[],it=day.filter(x=>x.geo&&!(x.task&&doneT[x.tid])).sort((a,b)=>a.start-b.start),pts=OF?[OF]:[];
+ const office=day.some(x=>x.task&&!x.loc&&!doneT[x.tid]),MH='<div id="map"></div><div class="mu" id="lg"></div><div class="mu" id="ri"></div>';
  it.forEach(x=>{if(!pts.length||key(pts[pts.length-1])!==key(x.geo))pts.push(x.geo)});
  if(OF&&key(pts[pts.length-1])!==key(OF))pts.push(OF);
- $('mb').innerHTML='<b>'+new Date(k+'T00:00').toLocaleDateString('nl-BE',{weekday:'long',day:'numeric',month:'long'})+'</b>'+(it.length?'<ul>'+it.map(x=>'<li>'+tm(x.start)+' '+esc(x.name||'')+' <span class="mu">'+esc((x.loc||'').split(',')[0])+'</span></li>').join('')+'</ul><div id="map"></div><div class="mu" id="ri"></div>':'<div class="mu">Geen locaties op deze dag.</div>');
- $('ov').hidden=false;showMap(pts);}
+ let body='<div class="mu">Geen locaties op deze dag.</div>',show=false;
+ if(it.length){show=true;body='<ul>'+it.map(x=>'<li>'+tm(x.start)+' '+esc(x.name||'')+' <span class="mu">'+esc((x.loc||'').split(',')[0])+'</span></li>').join('')+'</ul>'+MH}
+ else if(office&&OF){show=true;body='<div>Alle taken van deze dag zijn op kantoor'+($('office').value.trim()?': '+esc($('office').value.trim()):'')+'.</div>'+MH}
+ $('mb').innerHTML='<b>'+new Date(k+'T00:00').toLocaleDateString('nl-BE',{weekday:'long',day:'numeric',month:'long'})+'</b>'+body;
+ $('ov').hidden=false;if(show)showMap(pts);}
 let sgT;$('nl').oninput=()=>{clearTimeout(sgT);const v=$('nl').value.trim();if(v.length<4)return;     // adressen aanvullen
  sgT=setTimeout(async()=>{try{const r=await(await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q='+encodeURIComponent(v))).json();
   $('dl').innerHTML=r.map(o=>{G[o.display_name.toLowerCase()]=[+o.lat,+o.lon];return'<option value="'+esc(o.display_name)+'">'}).join('');sv()}catch(e){}},1200)};
@@ -270,7 +262,7 @@ $('go').onclick=async()=>{
    if(!n.lunch)return trip(pl,n.pl);
    const o=fx[k+1],ok=o&&o.s<+b,g2=((ok?o.s:+b)-n.e)/6e4;   // lunch is plaatsneutraal: de rit mag na de lunch gebeuren
    return Math.max(0,trip(pl,ok?o.pl:null)-Math.max(0,g2));};
-  let cur=+a,at=null;                                       // at = plaats waar je nu bent
+  let cur=+a,at=null,le=+a;                                       // at = plaats waar je nu bent
   for(let k=0;k<=fx.length;k++){
    const n=fx[k],gs=Math.max(cur,+a),ge=Math.min(n?n.s:+b,+b);
    let ep=gs;
@@ -284,10 +276,10 @@ $('go').onclick=async()=>{
      const m=Math.min(room,t.left),s=p+pre*6e4;
      if(pre>0)travels.push({name:'🚗 Reis naar '+(L?L.loc.split(',')[0]:'kantoor'),start:new Date(p),end:new Date(p+pre*6e4),travel:true,task:false});
      plan.push({geo:t.geo,fr:at?at.geo:OF,name:t.name,start:new Date(s),end:new Date(s+m*6e4),task:true,loc:t.loc,tr:pre,tid:t.tid});
-     p=s+m*6e4;ep=p;t.left-=m;at=L;}}
+     p=s+m*6e4;ep=p;le=p;t.left-=m;at=L;}}
    if(n&&!n.lunch&&n.pl){const T=trip(at,n.pl);if(T>0)travels.push({name:'🚗 Reis naar '+n.pl.loc.split(',')[0],start:new Date(n.s-T*6e4),end:new Date(n.s),travel:true,task:false})}
-   if(!n&&at){const T=trip(at,null);if(T>0)travels.push({name:'🚗 Terug naar kantoor',start:new Date(ep),end:new Date(ep+T*6e4),travel:true,task:false})}
-   if(n){cur=Math.max(cur,n.e);if(!n.lunch)at=n.pl;}
+   if(!n&&at){const T=trip(at,null);if(T>0)travels.push({name:'🚗 Terug naar kantoor',start:new Date(le),end:new Date(le+T*6e4),travel:true,task:false})}
+   if(n){cur=Math.max(cur,n.e);if(!n.lunch){at=n.pl;le=n.e}}
   }
  }
  render(q,start,days);planned=true;};
@@ -317,7 +309,8 @@ function render(q,start,days){
  $('out').innerHTML=h;
  const ex=$('ex');if(ex)ex.onclick=exportICS;}
 
-function detail(x){return detail0(x)+(x.geo?'<div id="map"></div><div class="mu" id="ri"></div><div style="margin-top:6px"><a href="https://maps.apple.com/?daddr='+x.geo+'" target="_blank">Navigeer met Apple Kaarten</a> · <a href="https://www.google.com/maps/dir/?api=1&destination='+x.geo+'" target="_blank">Google Maps</a></div>':'')}
+function detail(x){const g=x.geo||(x.task&&!x.loc&&OF?OF:null);       // taak op kantoor: kantoor aanduiden
+ return detail0(x)+(g?'<div id="map"></div><div class="mu" id="lg"></div><div class="mu" id="ri"></div><div style="margin-top:6px"><a href="https://maps.apple.com/?daddr='+g+'" target="_blank">Navigeer met Apple Kaarten</a> · <a href="https://www.google.com/maps/dir/?api=1&destination='+g+'" target="_blank">Google Maps</a></div>':'')}
 function detail0(x){
  const f=d=>d.toLocaleDateString('nl-BE',{weekday:'short',day:'numeric',month:'short'});
  const r=(a,b)=>b?'<div><span class="mu">'+a+':</span> '+b+'</div>':'';
@@ -336,7 +329,7 @@ $('out').onclick=e=>{
  const it=e.target.closest('.it');if(!it)return;
  const x=view[+it.dataset.i];
  if(x.travel)return;
- $('mb').innerHTML=detail(x);$('ov').hidden=false;showMap(x.geo?[x.fr||OF,x.geo]:null);};                  // popup met info
+ $('mb').innerHTML=detail(x);$('ov').hidden=false;showMap(x.geo?[x.fr||OF,x.geo]:(x.task&&!x.loc&&OF?[OF]:null));};                  // popup met info
 const shut=()=>{$('ov').hidden=true;closeMap()};
 $('ov').onclick=e=>{if(e.target.id==='ov')shut()};
 $('cl').onclick=shut;
