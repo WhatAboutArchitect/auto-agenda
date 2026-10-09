@@ -34,7 +34,7 @@ button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(
 .mod{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:14px;padding:16px 16px 12px;width:100%;max-width:520px;max-height:85vh;overflow:auto;font-size:14px;position:relative}
 .mod .x{position:absolute;top:8px;right:8px;padding:3px 8px}.mod #mb div{margin:4px 0}.mod #mb{padding-right:28px}
 #lg{margin-top:6px}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 5px 0 12px}#lg .dot:first-child{margin-left:0}
-#map{height:240px;border-radius:8px;margin-top:8px}.dm{font-size:12px;padding:2px 8px;margin-left:8px}
+#map{height:240px;border-radius:8px;margin-top:8px}.ed{padding:1px 6px;font-size:12px;margin-left:6px}.dm{font-size:12px;padding:2px 8px;margin-left:8px}
 .it.tv{background:transparent;border:1px dashed var(--bd);color:var(--mu);font-size:13px;cursor:default}
 .it.sel{outline:2px solid var(--ac)}.it.rel{outline:2px dashed var(--ac)}
 .det{margin:-2px 0 6px;padding:8px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--card);font-size:13px}
@@ -45,10 +45,11 @@ button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(
 <div class="mu" id="si">Apple Agenda → Archief → Exporteer → Exporteer… geeft een .ics-bestand.</div></div>
 <div class="card"><h2>2. Takenlijst (.xlsx of .csv)</h2>
 <input type="file" id="ft" accept=".xlsx,.xls,.csv">
-<div class="mu" id="st">Kolommen: Taak, Duur (uren, bv. 1,5), optioneel Deadline, Prioriteit (1 = hoogst), Locatie (leeg = op kantoor) en Niet splitsen (ja = in één blok). <a href="#" id="tpl">Voorbeeld</a></div></div>
+<div class="mu" id="st">Kolommen: Taak, Duur (uren, bv. 1,5), optioneel Deadline, Prioriteit (1 = hoogst), Locatie (leeg = op kantoor), Niet splitsen (ja = in één blok) en Startdatum (leeg = zo snel mogelijk). <a href="#" id="tpl">Voorbeeld</a></div></div>
 <div class="card"><h2>Extra taak toevoegen (optioneel)</h2><div class="row">
 <label>Taak<input id="nn" style="width:170px"></label>
 <label>Duur (uren)<input type="number" id="nd" value="1" min="0.25" step="0.25"></label>
+<label>Starten vanaf (leeg = nu)<input type="date" id="nsd"></label>
 <label>Deadline<input type="date" id="ndl"></label>
 <label>Prioriteit (1 = hoogst)<input type="number" id="np" value="3" min="1" max="5"></label>
 <label>Locatie (leeg = kantoor)<input id="nl" list="dl" style="width:190px"></label><datalist id="dl"></datalist>
@@ -141,21 +142,22 @@ function pdate(v){if(!v)return null;if(v instanceof Date)return new Date(v.getFu
 function parseTasks(rows){
  return rows.map(r=>{
   const g=(...ks)=>{for(const k of Object.keys(r)){const kl=k.toLowerCase();if(ks.some(x=>kl.includes(x)))return{k:kl,v:r[k]}}return{}};
-  const n=g('taak','task','titel','naam'),d=g('duur','minut','tijd','uur','min'),dl=g('deadline','vervaldatum','tegen'),p=g('prio'),lc=g('locat','plaats','adres'),sp=g('splits','ononderbr');
+  const n=g('taak','task','titel','naam'),d=g('duur','minut','tijd','uur','min'),dl=g('deadline','vervaldatum','tegen'),p=g('prio'),lc=g('locat','plaats','adres'),sp=g('splits','ononderbr'),sc=g('startdatum','start','begin','vanaf');
   let min=parseFloat(String(d.v||'').replace(',','.'));if(!(d.k&&d.k.includes('min')))min*=60;   // standaard uren; staat 'min' in de kolomnaam, dan minuten
   if(!n.v||!(min>0))return null;
   const L=String(lc.v||'').trim(),cm=L.match(/^(-?\d+\.\d+)\s*[,;]\s*(-?\d+\.\d+)$/);
-  return{name:String(n.v),min:Math.round(min),dl:pdate(dl.v),prio:parseInt(p.v)||3,loc:L,geo:cm?[+cm[1],+cm[2]]:null,ns:/^(ja|j|yes|y|x|1|true|waar|✓)$/i.test(String(sp.v||'').trim())};
+  return{name:String(n.v),min:Math.round(min),dl:pdate(dl.v),prio:parseInt(p.v)||3,loc:L,geo:cm?[+cm[1],+cm[2]]:null,sd:pdate(sc.v),ns:/^(ja|j|yes|y|x|1|true|waar|✓)$/i.test(String(sp.v||'').trim())};
  }).filter(Boolean);}
 $('fi').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  events=parseICS(await f.text());$('si').textContent=events.length+' afspraken ingelezen (hele-dag-items worden genegeerd).';};
 $('ft').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  const wb=XLSX.read(await f.arrayBuffer(),{cellDates:true});
- doneT={};tasks=parseTasks(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]));
- $('st').textContent=tasks.length+' taken ingelezen, samen '+Math.round(tasks.reduce((a,t)=>a+t.min,0)/6)/10+' uur.';};
+ doneT={};const all=parseTasks(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])),sn=new Set();
+ tasks=all.filter(t=>{const k=t.name.trim().toLowerCase();if(sn.has(k))return false;sn.add(k);return true});   // geen dubbele namen
+ $('st').textContent=tasks.length+' taken ingelezen, samen '+Math.round(tasks.reduce((a,t)=>a+t.min,0)/6)/10+' uur.'+(all.length>tasks.length?' '+(all.length-tasks.length)+' dubbele naam/namen genegeerd.':'');};
 $('tpl').onclick=async e=>{e.preventDefault();
  const dl=await claude.use('downloads');
- const csv='Taak,Duur (uren),Deadline,Prioriteit,Locatie,Niet splitsen\nOfferte opstellen,1.5,2026-10-09,1,,ja\nMails beantwoorden,0.75,,3,,\nOpmeting werf,2,2026-10-12,2,Gent,ja\n';
+ const csv='Taak,Duur (uren),Deadline,Prioriteit,Locatie,Niet splitsen,Startdatum\nOfferte opstellen,1.5,2026-10-09,1,,ja,\nMails beantwoorden,0.75,,3,,,\nOpmeting werf,2,2026-10-16,2,Gent,ja,2026-10-12\n';
  if(dl)dl.save({filename:'taken-voorbeeld.csv',data:csv}).catch(()=>{});else alert(csv);};
 
 // ---------- Reistijd ----------
@@ -226,9 +228,9 @@ function openDay(k){
  else if(office&&OF){show=true;body='<div>Alle taken van deze dag zijn op kantoor'+($('office').value.trim()?': '+esc($('office').value.trim()):'')+'.</div>'+MH}
  $('mb').innerHTML='<b>'+new Date(k+'T00:00').toLocaleDateString('nl-BE',{weekday:'long',day:'numeric',month:'long'})+'</b>'+body;
  $('ov').hidden=false;if(show)showMap(pts);}
-let sgT;$('nl').oninput=()=>{clearTimeout(sgT);const v=$('nl').value.trim();if(v.length<4)return;     // adressen aanvullen
+let sgT;document.addEventListener('input',ev=>{if(!['nl','el'].includes(ev.target.id))return;clearTimeout(sgT);const v=ev.target.value.trim();if(v.length<4)return;     // adressen aanvullen
  sgT=setTimeout(async()=>{try{const r=await(await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q='+encodeURIComponent(v))).json();
-  $('dl').innerHTML=r.map(o=>{G[o.display_name.toLowerCase()]=[+o.lat,+o.lon];return'<option value="'+esc(o.display_name)+'">'}).join('');sv()}catch(e){}},1200)};
+  $('dl').innerHTML=r.map(o=>{G[o.display_name.toLowerCase()]=[+o.lat,+o.lon];return'<option value="'+esc(o.display_name)+'">'}).join('');sv()}catch(e){}},1200)});
 
 // ---------- Planner ----------
 $('go').onclick=async()=>{
@@ -264,11 +266,12 @@ $('go').onclick=async()=>{
    return Math.max(0,trip(pl,ok?o.pl:null)-Math.max(0,g2));};
   let cur=+a,at=null,le=+a;                                       // at = plaats waar je nu bent
   for(let k=0;k<=fx.length;k++){
-   const n=fx[k],gs=Math.max(cur,+a),ge=Math.min(n?n.s:+b,+b);
+   const now0=dstr(d)===dstr(new Date())?Math.ceil(Date.now()/3e5)*3e5:0,n=fx[k],gs=Math.max(cur,+a,now0),ge=Math.min(n?n.s:+b,+b);
    let ep=gs;
    if(ge>gs){let p=gs;
     for(const t of q){
      if(t.left<=0)continue;
+     if(t.sd&&+d<+t.sd)continue;                            // nog niet starten
      if(t.dl&&+d>+t.dl)continue;                            // na de deadline: niet meer inplannen
      const L=pt(t),pre=trip(at,L),post=need(k,L);
      const room=Math.floor((ge-p)/6e4)-pre-post;
@@ -295,7 +298,7 @@ function render(q,start,days){
  dayMap=map;let h='';const left=q.filter(t=>t.left>0);
  if(left.length)h+='<div class="card wa"><b>Niet ingepland:</b> '+left.map(t=>esc(t.name)+' ('+t.left+' min'+(t.dl?', deadline '+dstr(t.dl):'')+(t.ns?', niet splitsbaar – geen gat groot genoeg':'')+')').join(', ')+'</div>';
  else h+='<div class="card">✅ Alle taken zijn ingepland. <button id="ex">Exporteer planning</button> <span class="mu">(bewaard als .txt: hernoem naar .ics en open in Apple Agenda)</span></div>';
- h+='<div class="card"><h2>Taken</h2>'+tasks.map((t,i)=>'<label class="tk"><input type="checkbox" data-k="'+i+'"'+(doneT[i]?' checked':'')+'><i style="background:'+PAL[i%PAL.length]+'"></i><span'+(doneT[i]?' class="dn"':'')+'>'+esc(t.name)+'</span><span class="mu">'+fmtH(t.min)+'</span></label>').join('')+'</div>';
+ h+='<div class="card"><h2>Taken</h2>'+tasks.map((t,i)=>'<label class="tk"><input type="checkbox" data-k="'+i+'"'+(doneT[i]?' checked':'')+'><i style="background:'+PAL[i%PAL.length]+'"></i><span'+(doneT[i]?' class="dn"':'')+'>'+esc(t.name)+'</span><span class="mu">'+fmtH(t.min)+'</span><button class="ed" data-e="'+i+'" title="Aanpassen">✏️</button></label>').join('')+'</div>';
  h+='<div class="mu" style="margin-bottom:6px">Tik op een item voor details. Vink een taak af in de lijst "Taken" en druk op "Plan in" om de rest opnieuw in te plannen.</div>';
  Object.keys(map).sort().forEach(k=>{
   const d=new Date(k+'T00:00');
@@ -310,17 +313,18 @@ function render(q,start,days){
  const ex=$('ex');if(ex)ex.onclick=exportICS;}
 
 function detail(x){const g=x.geo||(x.task&&!x.loc&&OF?OF:null);       // taak op kantoor: kantoor aanduiden
- return detail0(x)+(g?'<div id="map"></div><div class="mu" id="lg"></div><div class="mu" id="ri"></div><div style="margin-top:6px"><a href="https://maps.apple.com/?daddr='+g+'" target="_blank">Navigeer met Apple Kaarten</a> · <a href="https://www.google.com/maps/dir/?api=1&destination='+g+'" target="_blank">Google Maps</a></div>':'')}
+ return detail0(x)+(x.task?'<div style="margin-top:8px"><button data-e="'+x.tid+'">✏️ Taak aanpassen</button></div>':'')+(g?'<div id="map"></div><div class="mu" id="lg"></div><div class="mu" id="ri"></div><div style="margin-top:6px"><a href="https://maps.apple.com/?daddr='+g+'" target="_blank">Navigeer met Apple Kaarten</a> · <a href="https://www.google.com/maps/dir/?api=1&destination='+g+'" target="_blank">Google Maps</a></div>':'')}
 function detail0(x){
  const f=d=>d.toLocaleDateString('nl-BE',{weekday:'short',day:'numeric',month:'short'});
  const r=(a,b)=>b?'<div><span class="mu">'+a+':</span> '+b+'</div>':'';
  if(!x.task)return r('Afspraak',esc(x.name||''))+r('Tijd',tm(x.start)+' – '+tm(x.end))+r('Locatie',esc(x.loc||''))+r('Reistijd',x.tr?x.tr+' min enkele rit (kantoor ↔ afspraak)':'');
  const t=tasks[x.tid],ch=plan.filter(p=>p.tid===x.tid).sort((a,b)=>a.start-b.start),dm=doneT[x.tid];
- return r('Taak',esc(t.name))+r('Totale duur',fmtH(t.min))+r('Status',dm?'afgewerkt ✓':'')+r('Deadline',t.dl?f(t.dl):'')
+ return r('Taak',esc(t.name))+r('Totale duur',fmtH(t.min))+r('Status',dm?'afgewerkt ✓':'')+r('Starten vanaf',t.sd?f(t.sd):'zo snel mogelijk')+r('Deadline',t.dl?f(t.dl):'')
   +r('Prioriteit',t.prio)+r('Locatie',esc(t.loc||'kantoor'))+r('Splitsen',t.ns?'niet toegestaan':'toegestaan')+r('Reistijd ervoor',x.tr?x.tr+' min':'')
   +(ch.length>1?r('Alle delen','<br>'+ch.map(p=>f(p.start)+' '+tm(p.start)+'–'+tm(p.end)+(dm?' ✓':'')).join('<br>')):'');}
 
 $('out').onclick=e=>{
+ const eb=e.target.closest('[data-e]');if(eb){editTask(+eb.dataset.e);return}
  const db=e.target.closest('[data-day]');if(db){openDay(db.dataset.day);return}
  const cb=e.target.closest('input[data-k]');
  if(cb){const k=cb.dataset.k;doneT[+k]=cb.checked;                 // hele taak afvinken: alle delen doorstrepen
@@ -333,15 +337,40 @@ $('out').onclick=e=>{
 const shut=()=>{$('ov').hidden=true;closeMap()};
 $('ov').onclick=e=>{if(e.target.id==='ov')shut()};
 $('cl').onclick=shut;
+$('mb').onclick=e=>{const eb=e.target.closest('[data-e]');if(eb)editTask(+eb.dataset.e);
+ if(e.target.id==='ec')shut();if(e.target.id==='es')saveTask(+e.target.dataset.i)};
+function editTask(i){                                                  // taak aanpassen in popup
+ const t=tasks[i],f='style="width:100%;box-sizing:border-box"';
+ closeMap();$('mb').innerHTML='<b>Taak aanpassen</b><div class="row" style="margin-top:8px">'
+  +'<label style="width:100%">Taak<input id="en" '+f+' value="'+esc(t.name)+'"></label>'
+  +'<label>Duur (uren)<input type="number" id="ed" min="0.25" step="0.25" value="'+Math.round(t.min/6)/10+'"></label>'
+  +'<label>Starten vanaf (leeg = nu)<input type="date" id="esd" value="'+(t.sd?dstr(t.sd):'')+'"></label>'
+  +'<label>Deadline<input type="date" id="edl" value="'+(t.dl?dstr(t.dl):'')+'"></label>'
+  +'<label>Prioriteit<input type="number" id="ep" min="1" max="5" value="'+t.prio+'"></label>'
+  +'<label style="width:100%">Locatie (leeg = kantoor)<input id="el" list="dl" '+f+' value="'+esc(t.loc||'')+'"></label>'
+  +'<label><span>Niet splitsen</span><input type="checkbox" id="ens"'+(t.ns?' checked':'')+'></label></div>'
+  +'<div class="mu" id="em" style="margin-top:6px"></div><div style="margin-top:8px"><button class="p" id="es" data-i="'+i+'">Opslaan</button> <button id="ec">Annuleren</button></div>';
+ $('ov').hidden=false;}
+function saveTask(i){
+ const t=tasks[i],name=$('en').value.trim(),h=parseFloat($('ed').value);
+ if(!name||!(h>0)){$('em').textContent='Vul een naam en een duur (uren) in.';return}
+ if($('esd').value&&$('edl').value&&$('esd').value>$('edl').value){$('em').textContent='De startdatum ligt na de deadline.';return}
+ if(tasks.some((u,j)=>j!==i&&u.name.trim().toLowerCase()===name.toLowerCase())){$('em').textContent='Er bestaat al een taak met de naam "'+name+'".';return}
+ const L=$('el').value.trim(),cm=L.match(/^(-?\d+\.\d+)\s*[,;]\s*(-?\d+\.\d+)$/);
+ Object.assign(t,{name,min:Math.round(h*60),sd:$('esd').value?pdate($('esd').value):null,dl:$('edl').value?pdate($('edl').value):null,prio:parseInt($('ep').value)||3,ns:$('ens').checked});
+ if(L!==(t.loc||'')||!t.geo){t.loc=L;t.geo=cm?[+cm[1],+cm[2]]:null}      // nieuwe locatie wordt opnieuw opgezocht
+ shut();if(planned)$('go').onclick();}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')shut()});
 
 // ---------- Extra taak toevoegen ----------
 $('na').onclick=()=>{
  const name=$('nn').value.trim(),h=parseFloat($('nd').value);
  if(!name||!(h>0)){$('nm').textContent='Vul een naam en een duur (uren) in.';return}
+ if($('nsd').value&&$('ndl').value&&$('nsd').value>$('ndl').value){$('nm').textContent='De startdatum ligt na de deadline.';return}
+ if(tasks.some(u=>u.name.trim().toLowerCase()===name.toLowerCase())){$('nm').textContent='Er bestaat al een taak met de naam "'+name+'".';return}
  const L=$('nl').value.trim(),cm=L.match(/^(-?\d+\.\d+)\s*[,;]\s*(-?\d+\.\d+)$/);
- tasks.push({name,min:Math.round(h*60),dl:$('ndl').value?pdate($('ndl').value):null,prio:parseInt($('np').value)||3,loc:L,geo:cm?[+cm[1],+cm[2]]:null,ns:$('ns').checked});
- $('nn').value='';$('nl').value='';$('ndl').value='';$('ns').checked=false;
+ tasks.push({name,min:Math.round(h*60),sd:$('nsd').value?pdate($('nsd').value):null,dl:$('ndl').value?pdate($('ndl').value):null,prio:parseInt($('np').value)||3,loc:L,geo:cm?[+cm[1],+cm[2]]:null,ns:$('ns').checked});
+ $('nn').value='';$('nl').value='';$('ndl').value='';$('nsd').value='';$('ns').checked=false;
  $('st').textContent=tasks.length+' taken, samen '+Math.round(tasks.reduce((a,t)=>a+t.min,0)/6)/10+' uur.';
  $('nm').textContent='"'+name+'" toegevoegd.'+(planned?' Planning bijgewerkt.':' Druk op "Plan in".');
  if(planned)$('go').onclick();};
