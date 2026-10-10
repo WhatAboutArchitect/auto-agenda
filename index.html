@@ -238,8 +238,9 @@ let NT={};try{NT=JSON.parse(localStorage.getItem('nt2')||'{}')}catch(e){}
 const svN=()=>{try{localStorage.setItem('nt2',JSON.stringify(NT))}catch(e){}};
 const noteKey=x=>x.task?'t|'+tasks[x.tid].name.toLowerCase():'e|'+(x.name||'')+'|'+(+x.start);
 function detail(x){const k=(x.task||x.src)?noteKey(x):null;
- return detailB(x)+(k?'<div style="margin-top:10px"><label>📝 Notitie<textarea id="nt" rows="3" data-k="'+esc(k)+'" placeholder="Schrijf hier een notitie…">'+esc(NT[k]||'')+'</textarea></label></div>':'')}
-document.addEventListener('input',ev=>{if(ev.target.id!=='nt')return;const k=ev.target.dataset.k,v=ev.target.value;if(v.trim())NT[k]=v;else delete NT[k];svN()});
+ return detailB(x)+(k?'<div style="margin-top:10px"><label>📝 Notitie<textarea id="nt" rows="3" data-k="'+esc(k)+'" data-i="'+x.i+'" placeholder="Schrijf hier een notitie…">'+esc(NT[k]||'')+'</textarea></label></div>':'')}
+document.addEventListener('input',ev=>{if(ev.target.id!=='nt')return;const k=ev.target.dataset.k,v=ev.target.value;if(v.trim())NT[k]=v;else delete NT[k];svN();
+ const it=document.querySelector('.it[data-i="'+ev.target.dataset.i+'"]'),m=it&&it.querySelector('.nm');if(m)m.hidden=!v.trim()});   // 📝 meteen tonen/verbergen
 
 // ---------- Vaste afspraken aanpassen (alleen in deze sessie, je agenda zelf verandert niet) ----------
 function editEvent(i){
@@ -343,7 +344,7 @@ function render(q,start,days){
   h+='<div class="day">'+d.toLocaleDateString('nl-BE',{weekday:'long',day:'numeric',month:'long'})+' <button class="dm" data-day="'+k+'">🗺 Dagkaart</button></div>';
   map[k].sort((a,b)=>a.start-b.start).forEach(x=>{
    h+='<div class="it'+(x.task?' t':'')+(x.task&&doneT[x.tid]?' done':'')+(x.travel?' tv':'')+'" data-i="'+x.i+'"'+(x.task?' data-t="'+x.tid+'" style="border-left:4px solid '+PAL[x.tid%PAL.length]+'"':'')+'>'
-    +'<b>'+tm(x.start)+' – '+tm(x.end)+'</b><span>'+(x.task||x.travel?'':'📌 ')+esc(x.name||'(afspraak)')+((x.task||x.src)&&NT[noteKey(x)]?' 📝':'')
+    +'<b>'+tm(x.start)+' – '+tm(x.end)+'</b><span>'+(x.task||x.travel?'':'📌 ')+esc(x.name||'(afspraak)')+((x.task||x.src)?'<span class="nm"'+(NT[noteKey(x)]?'':' hidden')+'> 📝</span>':'')
     +(x.travel?' <span class="mu">· '+Math.round((x.end-x.start)/6e4)+' min</span>':'')+(x.parts>1?' <span class="mu">· deel '+x.part+'/'+x.parts+'</span>':'')
     +(x.loc?' <span class="mu">· '+esc(x.loc.split(',')[0])+(x.tr?' · '+x.tr+(x.task?' min reis ervoor':' min reistijd (kantoor ↔ afspraak)'):'')+'</span>':'')
     +'</span></div>'});});
