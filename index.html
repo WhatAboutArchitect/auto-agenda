@@ -70,6 +70,8 @@ button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(
 <label>Standaardreistijd (min), als berekening mislukt<input type="number" id="buf" value="20" min="0"></label>
 <label>Min. blok (min)<input type="number" id="minc" value="30" min="5"></label>
 <label><span>Weekend</span><input type="checkbox" id="wk"></label>
+<label><span>Buurt bundelen</span><input type="checkbox" id="bun" checked></label>
+<label>Binnen (min rijden)<input type="number" id="rad" value="15" min="0"></label>
 <button class="p" id="go">Plan in</button></div></div>
 <div class="mu" id="gs"></div>
 <div id="out"></div>
@@ -246,6 +248,7 @@ $('go').onclick=async()=>{
   .sort((a,b)=>(a.dl?+a.dl:9e15)-(b.dl?+b.dl:9e15)||a.prio-b.prio||String(a.loc).localeCompare(String(b.loc)));
  lastEvs.forEach(e=>e.tr=travel(e,buf));
  const ls=$('ls').value.split(':').map(Number),ld=+$('ld').value||0;
+ const bun=$('bun').checked,rad=+$('rad').value||0;
  plan=[];lunches=[];travels=[];
  for(let i=0;i<days;i++){
   const d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i);
@@ -269,17 +272,21 @@ $('go').onclick=async()=>{
    const now0=dstr(d)===dstr(new Date())?Math.ceil(Date.now()/3e5)*3e5:0,n=fx[k],gs=Math.max(cur,+a,now0),ge=Math.min(n?n.s:+b,+b);
    let ep=gs;
    if(ge>gs){let p=gs;
-    for(const t of q){
-     if(t.left<=0)continue;
-     if(t.sd&&+d<+t.sd)continue;                            // nog niet starten
-     if(t.dl&&+d>+t.dl)continue;                            // na de deadline: niet meer inplannen
+    const tryPlace=t=>{
+     if(t.left<=0)return false;
+     if(t.sd&&+d<+t.sd)return false;                        // nog niet starten
+     if(t.dl&&+d>+t.dl)return false;                        // na de deadline: niet meer inplannen
      const L=pt(t),pre=trip(at,L),post=need(k,L);
      const room=Math.floor((ge-p)/6e4)-pre-post;
-     if(room<=0||(t.ns?room<t.left:(room<minc&&room<t.left)))continue;   // 'niet splitsen': alles of niets
+     if(room<=0||(t.ns?room<t.left:(room<minc&&room<t.left)))return false;   // 'niet splitsen': alles of niets
      const m=Math.min(room,t.left),s=p+pre*6e4;
      if(pre>0)travels.push({name:'🚗 Reis naar '+(L?L.loc.split(',')[0]:'kantoor'),start:new Date(p),end:new Date(p+pre*6e4),travel:true,task:false});
      plan.push({geo:t.geo,fr:at?at.geo:OF,name:t.name,start:new Date(s),end:new Date(s+m*6e4),task:true,loc:t.loc,tr:pre,tid:t.tid});
-     p=s+m*6e4;ep=p;le=p;t.left-=m;at=L;}}
+     p=s+m*6e4;ep=p;le=p;t.left-=m;at=L;return true};
+    // bundelen: niet-dringende taken vlakbij de huidige plaats meteen meenemen (deadlines blijven leidend)
+    const pull=()=>{if(bun&&at)for(const t of q)if(t.loc&&t.left>0&&!(t.dl&&+t.dl-+d<1.9*864e5)&&trip(at,pt(t))<=rad)tryPlace(t)};
+    pull();
+    for(const t of q)if(tryPlace(t))pull();}
    if(n&&!n.lunch&&n.pl){const T=trip(at,n.pl);if(T>0)travels.push({name:'🚗 Reis naar '+n.pl.loc.split(',')[0],start:new Date(n.s-T*6e4),end:new Date(n.s),travel:true,task:false})}
    if(!n&&at){const T=trip(at,null);if(T>0)travels.push({name:'🚗 Terug naar kantoor',start:new Date(le),end:new Date(le+T*6e4),travel:true,task:false})}
    if(n){cur=Math.max(cur,n.e);if(!n.lunch){at=n.pl;le=n.e}}
