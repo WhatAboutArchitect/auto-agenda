@@ -109,7 +109,7 @@ function parseICS(txt){
  return out;}
 function expand(e,from,to){
  const dur=e.end-e.start;
- if(!e.rr)return(e.end>from&&e.start<to)?[e]:[];
+ if(!e.rr)return(e.end>from&&e.start<to)?[{...e,src:e}]:[];
  const r=Object.fromEntries(e.rr.split(';').map(s=>s.split('=')));
  const iv=+(r.INTERVAL||1),cnt=r.COUNT?+r.COUNT:1e9;
  const until=r.UNTIL?pd(r.UNTIL.length===8?r.UNTIL+'T235959':r.UNTIL.replace(/Z?$/,'Z')):null;
@@ -132,7 +132,7 @@ function expand(e,from,to){
   const key=dstr(d).replace(/-/g,'');
   if(e.ex&&e.ex.includes(key))continue;
   const en=new Date(+st+dur);
-  if(en>from)out.push({...e,start:st,end:en});
+  if(en>from)out.push({...e,start:st,end:en,src:e,ok:key});
  }
  return out;}
 
@@ -233,6 +233,38 @@ let sgT;document.addEventListener('input',ev=>{if(!['nl','el'].includes(ev.targe
  sgT=setTimeout(async()=>{try{const r=await(await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q='+encodeURIComponent(v))).json();
   $('dl').innerHTML=r.map(o=>{G[o.display_name.toLowerCase()]=[+o.lat,+o.lon];return'<option value="'+esc(o.display_name)+'">'}).join('');sv()}catch(e){}},1200)});
 
+// ---------- Notities ----------
+let NT={};try{NT=JSON.parse(localStorage.getItem('nt2')||'{}')}catch(e){}
+const svN=()=>{try{localStorage.setItem('nt2',JSON.stringify(NT))}catch(e){}};
+const noteKey=x=>x.task?'t|'+tasks[x.tid].name.toLowerCase():'e|'+(x.name||'')+'|'+(+x.start);
+function detail(x){const k=(x.task||x.src)?noteKey(x):null;
+ return detailB(x)+(k?'<div style="margin-top:10px"><label>📝 Notitie<textarea id="nt" rows="3" data-k="'+esc(k)+'" placeholder="Schrijf hier een notitie…">'+esc(NT[k]||'')+'</textarea></label></div>':'')}
+document.addEventListener('input',ev=>{if(ev.target.id!=='nt')return;const k=ev.target.dataset.k,v=ev.target.value;if(v.trim())NT[k]=v;else delete NT[k];svN()});
+
+// ---------- Vaste afspraken aanpassen (alleen in deze sessie, je agenda zelf verandert niet) ----------
+function editEvent(i){
+ const x=view[i],f='style="width:100%;box-sizing:border-box"',T=d=>f2(d.getHours())+':'+f2(d.getMinutes());
+ closeMap();$('mb').innerHTML='<b>Afspraak aanpassen</b>'+(x.src.rr?'<div class="mu">Terugkerende afspraak: alleen deze keer wordt aangepast.</div>':'')+'<div class="row" style="margin-top:8px">'
+  +'<label style="width:100%">Titel<input id="vn" '+f+' value="'+esc(x.name||'')+'"></label>'
+  +'<label>Datum<input type="date" id="vd" value="'+dstr(x.start)+'"></label>'
+  +'<label>Van<input type="time" id="vs" value="'+T(x.start)+'"></label><label>Tot<input type="time" id="ve" value="'+T(x.end)+'"></label>'
+  +'<label style="width:100%">Locatie<input id="el" list="dl" '+f+' value="'+esc(x.loc||'')+'"></label></div>'
+  +'<div class="mu" id="vm" style="margin-top:6px">Dit past alleen de planner aan. Wijzig je agenda zelf ook, of laad hem later opnieuw in.</div>'
+  +'<div style="margin-top:8px"><button class="p" id="evs" data-i="'+i+'">Opslaan</button> <button id="evd" data-i="'+i+'">Afspraak schrappen</button> <button id="ec">Annuleren</button></div>';
+ $('ov').hidden=false;}
+function saveEvent(i,del){
+ const x=view[i],s0=x.src,k0=noteKey(x),again=()=>{shut();if(planned)$('go').onclick()};
+ if(del){if(s0.rr)(s0.ex=s0.ex||[]).push(x.ok);else events.splice(events.indexOf(s0),1);again();return}
+ const d=$('vd').value,a=$('vs').value,b=$('ve').value,L=$('el').value.trim();
+ if(!d||!a||!b){$('vm').textContent='Vul een datum en beide uren in.';return}
+ const st=new Date(d+'T'+a),off=Math.round((new Date(x.end.getFullYear(),x.end.getMonth(),x.end.getDate())-new Date(x.start.getFullYear(),x.start.getMonth(),x.start.getDate()))/864e5),hm=b.split(':').map(Number);
+ const en=new Date(st.getFullYear(),st.getMonth(),st.getDate()+off,hm[0],hm[1]);
+ if(!(en>st)){$('vm').textContent='Het einduur moet na het beginuur liggen.';return}
+ const nv={name:$('vn').value.trim(),start:st,end:en,loc:L,geo:L===(x.loc||'')?x.geo:null};     // nieuwe locatie wordt opnieuw opgezocht
+ if(s0.rr){(s0.ex=s0.ex||[]).push(x.ok);events.push(nv)}else Object.assign(s0,nv);
+ const k1='e|'+nv.name+'|'+(+st);if(k0!==k1&&NT[k0]){NT[k1]=NT[k0];delete NT[k0];svN()}
+ again();}
+
 // ---------- Planner ----------
 $('go').onclick=async()=>{
  if(!tasks.length){alert('Laad eerst een takenlijst.');return}
@@ -311,15 +343,15 @@ function render(q,start,days){
   h+='<div class="day">'+d.toLocaleDateString('nl-BE',{weekday:'long',day:'numeric',month:'long'})+' <button class="dm" data-day="'+k+'">🗺 Dagkaart</button></div>';
   map[k].sort((a,b)=>a.start-b.start).forEach(x=>{
    h+='<div class="it'+(x.task?' t':'')+(x.task&&doneT[x.tid]?' done':'')+(x.travel?' tv':'')+'" data-i="'+x.i+'"'+(x.task?' data-t="'+x.tid+'" style="border-left:4px solid '+PAL[x.tid%PAL.length]+'"':'')+'>'
-    +'<b>'+tm(x.start)+' – '+tm(x.end)+'</b><span>'+(x.task||x.travel?'':'📌 ')+esc(x.name||'(afspraak)')
+    +'<b>'+tm(x.start)+' – '+tm(x.end)+'</b><span>'+(x.task||x.travel?'':'📌 ')+esc(x.name||'(afspraak)')+((x.task||x.src)&&NT[noteKey(x)]?' 📝':'')
     +(x.travel?' <span class="mu">· '+Math.round((x.end-x.start)/6e4)+' min</span>':'')+(x.parts>1?' <span class="mu">· deel '+x.part+'/'+x.parts+'</span>':'')
     +(x.loc?' <span class="mu">· '+esc(x.loc.split(',')[0])+(x.tr?' · '+x.tr+(x.task?' min reis ervoor':' min reistijd (kantoor ↔ afspraak)'):'')+'</span>':'')
     +'</span></div>'});});
  $('out').innerHTML=h;
  const ex=$('ex');if(ex)ex.onclick=exportICS;}
 
-function detail(x){const g=x.geo||(x.task&&!x.loc&&OF?OF:null);       // taak op kantoor: kantoor aanduiden
- return detail0(x)+(x.task?'<div style="margin-top:8px"><button data-e="'+x.tid+'">✏️ Taak aanpassen</button></div>':'')+(g?'<div id="map"></div><div class="mu" id="lg"></div><div class="mu" id="ri"></div><div style="margin-top:6px"><a href="https://maps.apple.com/?daddr='+g+'" target="_blank">Navigeer met Apple Kaarten</a> · <a href="https://www.google.com/maps/dir/?api=1&destination='+g+'" target="_blank">Google Maps</a></div>':'')}
+function detailB(x){const g=x.geo||(x.task&&!x.loc&&OF?OF:null);       // taak op kantoor: kantoor aanduiden
+ return detail0(x)+(!x.task&&x.src?'<div style="margin-top:8px"><button data-ev="'+x.i+'">✏️ Afspraak aanpassen</button></div>':'')+(x.task?'<div style="margin-top:8px"><button data-e="'+x.tid+'">✏️ Taak aanpassen</button></div>':'')+(g?'<div id="map"></div><div class="mu" id="lg"></div><div class="mu" id="ri"></div><div style="margin-top:6px"><a href="https://maps.apple.com/?daddr='+g+'" target="_blank">Navigeer met Apple Kaarten</a> · <a href="https://www.google.com/maps/dir/?api=1&destination='+g+'" target="_blank">Google Maps</a></div>':'')}
 function detail0(x){
  const f=d=>d.toLocaleDateString('nl-BE',{weekday:'short',day:'numeric',month:'short'});
  const r=(a,b)=>b?'<div><span class="mu">'+a+':</span> '+b+'</div>':'';
@@ -343,8 +375,8 @@ $('out').onclick=e=>{
 const shut=()=>{$('ov').hidden=true;closeMap()};
 $('ov').onclick=e=>{if(e.target.id==='ov')shut()};
 $('cl').onclick=shut;
-$('mb').onclick=e=>{const eb=e.target.closest('[data-e]');if(eb)editTask(+eb.dataset.e);
- if(e.target.id==='ec')shut();if(e.target.id==='es')saveTask(+e.target.dataset.i)};
+$('mb').onclick=e=>{const eb=e.target.closest('[data-e]');if(eb)editTask(+eb.dataset.e);const ev=e.target.closest('[data-ev]');if(ev)editEvent(+ev.dataset.ev);
+ if(e.target.id==='ec')shut();if(e.target.id==='es')saveTask(+e.target.dataset.i);if(e.target.id==='evs')saveEvent(+e.target.dataset.i);if(e.target.id==='evd')saveEvent(+e.target.dataset.i,true)};
 function editTask(i){                                                  // taak aanpassen in popup
  const t=tasks[i],f='style="width:100%;box-sizing:border-box"';
  closeMap();$('mb').innerHTML='<b>Taak aanpassen</b><div class="row" style="margin-top:8px">'
@@ -363,7 +395,9 @@ function saveTask(i){
  if($('esd').value&&$('edl').value&&$('esd').value>$('edl').value){$('em').textContent='De startdatum ligt na de deadline.';return}
  if(tasks.some((u,j)=>j!==i&&u.name.trim().toLowerCase()===name.toLowerCase())){$('em').textContent='Er bestaat al een taak met de naam "'+name+'".';return}
  const L=$('el').value.trim(),cm=L.match(/^(-?\d+\.\d+)\s*[,;]\s*(-?\d+\.\d+)$/);
+ const nk0=noteKey({task:true,tid:i});
  Object.assign(t,{name,min:Math.round(h*60),sd:$('esd').value?pdate($('esd').value):null,dl:$('edl').value?pdate($('edl').value):null,prio:parseInt($('ep').value)||3,ns:$('ens').checked});
+ const nk1=noteKey({task:true,tid:i});if(nk0!==nk1&&NT[nk0]){NT[nk1]=NT[nk0];delete NT[nk0];svN()}   // notitie volgt de nieuwe naam
  if(L!==(t.loc||'')||!t.geo){t.loc=L;t.geo=cm?[+cm[1],+cm[2]]:null}      // nieuwe locatie wordt opnieuw opgezocht
  shut();if(planned)$('go').onclick();}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')shut()});
