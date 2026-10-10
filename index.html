@@ -158,9 +158,8 @@ $('ft').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  tasks=all.filter(t=>{const k=t.name.trim().toLowerCase();if(sn.has(k))return false;sn.add(k);return true});   // geen dubbele namen
  $('st').textContent=tasks.length+' taken ingelezen, samen '+Math.round(tasks.reduce((a,t)=>a+t.min,0)/6)/10+' uur.'+(all.length>tasks.length?' '+(all.length-tasks.length)+' dubbele naam/namen genegeerd.':'');};
 $('tpl').onclick=async e=>{e.preventDefault();
- const dl=await claude.use('downloads');
  const csv='Taak,Duur (uren),Deadline,Prioriteit,Locatie,Niet splitsen,Startdatum\nOfferte opstellen,1.5,2026-10-09,1,,ja,\nMails beantwoorden,0.75,,3,,,\nOpmeting werf,2,2026-10-16,2,Gent,ja,2026-10-12\n';
- if(dl)dl.save({filename:'taken-voorbeeld.csv',data:csv}).catch(()=>{});else alert(csv);};
+ saveFile('taken-voorbeeld.csv',csv,'text/csv');};
 
 // ---------- Reistijd ----------
 let lunches=[],travels=[];
@@ -304,7 +303,7 @@ function render(q,start,days){
  view.forEach((x,i)=>{x.i=i;const k=dstr(x.start);(map[k]=map[k]||[]).push(x)});
  dayMap=map;let h='';const left=q.filter(t=>t.left>0);
  if(left.length)h+='<div class="card wa"><b>Niet ingepland:</b> '+left.map(t=>esc(t.name)+' ('+t.left+' min'+(t.dl?', deadline '+dstr(t.dl):'')+(t.ns?', niet splitsbaar – geen gat groot genoeg':'')+')').join(', ')+'</div>';
- else h+='<div class="card">✅ Alle taken zijn ingepland. <button id="ex">Exporteer planning</button> <span class="mu">(bewaard als .txt: hernoem naar .ics en open in Apple Agenda)</span></div>';
+ else h+='<div class="card">✅ Alle taken zijn ingepland. <button id="ex">Exporteer planning</button> <span class="mu">(downloadt planning.ics: open het bestand om de taken in Apple Agenda te zetten)</span></div>';
  h+='<div class="card"><h2>Taken</h2>'+tasks.map((t,i)=>'<label class="tk"><input type="checkbox" data-k="'+i+'"'+(doneT[i]?' checked':'')+'><i style="background:'+PAL[i%PAL.length]+'"></i><span'+(doneT[i]?' class="dn"':'')+'>'+esc(t.name)+'</span><span class="mu">'+fmtH(t.min)+'</span><button class="ed" data-e="'+i+'" title="Aanpassen">✏️</button></label>').join('')+'</div>';
  h+='<div class="mu" style="margin-bottom:6px">Tik op een item voor details. Vink een taak af in de lijst "Taken" en druk op "Plan in" om de rest opnieuw in te plannen.</div>';
  Object.keys(map).sort().forEach(k=>{
@@ -386,7 +385,8 @@ async function exportICS(){
  const z=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
  const ics='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Auto-agenda//NL\r\n'+plan.filter(p=>!doneT[p.tid]).map((p,i)=>
   'BEGIN:VEVENT\r\nUID:auto-'+Date.now()+'-'+i+'@auto-agenda\r\nDTSTAMP:'+z(new Date())+'\r\nDTSTART:'+z(p.start)+'\r\nDTEND:'+z(p.end)+'\r\nSUMMARY:'+p.name.replace(/[,;]/g,' ')+(p.loc?'\r\nLOCATION:'+p.loc.replace(/[,;]/g,' '):'')+'\r\nEND:VEVENT\r\n').join('')+'END:VCALENDAR\r\n';
- const dl=await claude.use('downloads');
- if(dl)dl.save({filename:'planning.txt',data:ics}).catch(()=>{});
- else{navigator.clipboard&&navigator.clipboard.writeText(ics);alert('Gekopieerd naar klembord. Plak in een bestand planning.ics')}}
+ saveFile('planning.ics',ics,'text/calendar');}
+function saveFile(name,text,type){                             // gewone download in de browser
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;
+ document.body.appendChild(a);a.click();a.remove();}
 </script></body></html>
