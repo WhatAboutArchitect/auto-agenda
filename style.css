@@ -1,5 +1,5 @@
 /* style.css — opmaak van de Auto-agenda (lichtblauwe achtergrond) */
-:root{--bg:#dfe9f5;--card:#fff;--tx:#14213d;--mu:#4f6078;--ac:#2f6fed;--bd:#b7cdea;--ev:#eaf1fb;--tk:#ffffff;--wa:#b4231a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root{--bg:#eef4fb;--card:#fff;--tx:#14213d;--mu:#4f6078;--ac:#2f6fed;--bd:#b7cdea;--ev:#e1eaf6;--tk:#ffffff;--wa:#b4231a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111a26;--card:#1b2635;--tx:#eee;--mu:#9a9a94;--ac:#6b9bff;--bd:#2c3d52;--ev:#223148;--tk:#27406b;--wa:#ff8a80}}
 :root[data-theme="dark"]{--bg:#111a26;--card:#1b2635;--tx:#eee;--mu:#9a9a94;--ac:#6b9bff;--bd:#2c3d52;--ev:#223148;--tk:#27406b;--wa:#ff8a80}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
