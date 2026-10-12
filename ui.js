@@ -109,7 +109,7 @@ function render(q,start,days){
  dayMap=map;let h='';const left=q.filter(t=>t.left>0);
  const lst=left.map(t=>esc(t.name)+' ('+t.left+' min'+(t.dl?', deadline '+dstr(t.dl):'')+(t.ns?', niet splitsbaar – geen gat groot genoeg':'')+')').join(', ');
  unplanned=left.length?lst:'';
- if(left.length)h+='<div class="card wa"><b>Niet (volledig) ingepland:</b> '+lst+'<div style="margin-top:8px"><button id="ex">Exporteer planning</button> <span class="mu">(je krijgt eerst een bevestiging)</span></div></div>';
+ if(left.length)h+='<div class="card wa"><b>Niet (volledig) ingepland:</b> '+lst+'<div style="margin-top:8px"><button id="ex">Exporteer planning</button></div></div>';
  else h+='<div class="card">✅ Alle taken zijn ingepland. <button id="ex">Exporteer planning</button> <span class="mu">(downloadt planning.ics: open het bestand om de taken in Apple Agenda te zetten)</span></div>';
  h+='<div class="card"><h2>Taken</h2>'+tasks.map((t,i)=>'<label class="tk"><input type="checkbox" data-k="'+i+'"'+(doneT[i]?' checked':'')+'><i style="background:'+PAL[i%PAL.length]+'"></i><span'+(doneT[i]?' class="dn"':'')+'>'+esc(t.name)+'</span><span class="mu">'+fmtH(t.min)+'</span><button class="ed" data-e="'+i+'" title="Aanpassen">✏️</button></label>').join('')+'</div>';
  h+='<div class="mu" style="margin-bottom:6px">Tik op een item voor details. Vink een taak af in de lijst "Taken" en druk op "Plan in" om de rest opnieuw in te plannen.</div>';
