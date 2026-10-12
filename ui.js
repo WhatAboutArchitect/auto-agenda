@@ -3,7 +3,7 @@
    Alle berekeningen gebeuren in planner.js (object Planner). Dit bestand bevat zelf geen planninglogica. */
 const $=id=>document.getElementById(id);
 const {dstr,pdate,key,parseICS,parseTasks}=Planner,ll=g=>[g[1],g[0]];
-let events=[],tasks=[],plan=[],lastEvs=[],lunches=[],travels=[],doneT={},view=[],planned=false,dayMap={},OF=null,map=null;
+let events=[],tasks=[],plan=[],lastEvs=[],lunches=[],travels=[],doneT={},view=[],planned=false,unplanned='',dayMap={},OF=null,map=null;
 const f2=n=>String(n).padStart(2,'0');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const tm=d=>d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
@@ -107,7 +107,9 @@ function render(q,start,days){
  view=[...lastEvs.map(e=>({...e,task:false})),...lunches,...travels,...plan];
  view.forEach((x,i)=>{x.i=i;const k=dstr(x.start);(map[k]=map[k]||[]).push(x)});
  dayMap=map;let h='';const left=q.filter(t=>t.left>0);
- if(left.length)h+='<div class="card wa"><b>Niet ingepland:</b> '+left.map(t=>esc(t.name)+' ('+t.left+' min'+(t.dl?', deadline '+dstr(t.dl):'')+(t.ns?', niet splitsbaar – geen gat groot genoeg':'')+')').join(', ')+'</div>';
+ const lst=left.map(t=>esc(t.name)+' ('+t.left+' min'+(t.dl?', deadline '+dstr(t.dl):'')+(t.ns?', niet splitsbaar – geen gat groot genoeg':'')+')').join(', ');
+ unplanned=left.length?lst:'';
+ if(left.length)h+='<div class="card wa"><b>Niet (volledig) ingepland:</b> '+lst+'<div style="margin-top:8px"><button id="ex">Exporteer planning</button> <span class="mu">(je krijgt eerst een bevestiging)</span></div></div>';
  else h+='<div class="card">✅ Alle taken zijn ingepland. <button id="ex">Exporteer planning</button> <span class="mu">(downloadt planning.ics: open het bestand om de taken in Apple Agenda te zetten)</span></div>';
  h+='<div class="card"><h2>Taken</h2>'+tasks.map((t,i)=>'<label class="tk"><input type="checkbox" data-k="'+i+'"'+(doneT[i]?' checked':'')+'><i style="background:'+PAL[i%PAL.length]+'"></i><span'+(doneT[i]?' class="dn"':'')+'>'+esc(t.name)+'</span><span class="mu">'+fmtH(t.min)+'</span><button class="ed" data-e="'+i+'" title="Aanpassen">✏️</button></label>').join('')+'</div>';
  h+='<div class="mu" style="margin-bottom:6px">Tik op een item voor details. Vink een taak af in de lijst "Taken" en druk op "Plan in" om de rest opnieuw in te plannen.</div>';
@@ -121,7 +123,7 @@ function render(q,start,days){
     +(x.loc?' <span class="mu">· '+esc(x.loc.split(',')[0])+(x.tr?' · '+x.tr+(x.task?' min reis ervoor':' min reistijd (kantoor ↔ afspraak)'):'')+'</span>':'')
     +'</span></div>'});});
  $('out').innerHTML=h;
- const ex=$('ex');if(ex)ex.onclick=exportICS;}
+ const ex=$('ex');if(ex)ex.onclick=askExport;}
 
 function detailB(x){const g=x.geo||(x.task&&!x.loc&&OF?OF:null);       // taak op kantoor: kantoor aanduiden
  return detail0(x)+(!x.task&&x.src?'<div style="margin-top:8px"><button data-ev="'+x.i+'">✏️ Afspraak aanpassen</button></div>':'')+(x.task?'<div style="margin-top:8px"><button data-e="'+x.tid+'">✏️ Taak aanpassen</button></div>':'')+(g?'<div id="map"></div><div class="mu" id="lg"></div><div class="mu" id="ri"></div><div style="margin-top:6px"><a href="https://maps.apple.com/?daddr='+g+'" target="_blank">Navigeer met Apple Kaarten</a> · <a href="https://www.google.com/maps/dir/?api=1&destination='+g+'" target="_blank">Google Maps</a></div>':'')}
@@ -149,7 +151,7 @@ const shut=()=>{$('ov').hidden=true;closeMap()};
 $('ov').onclick=e=>{if(e.target.id==='ov')shut()};
 $('cl').onclick=shut;
 $('mb').onclick=e=>{const eb=e.target.closest('[data-e]');if(eb)editTask(+eb.dataset.e);const ev=e.target.closest('[data-ev]');if(ev)editEvent(+ev.dataset.ev);
- if(e.target.id==='ec')shut();if(e.target.id==='es')saveTask(+e.target.dataset.i);if(e.target.id==='evs')saveEvent(+e.target.dataset.i);if(e.target.id==='evd')saveEvent(+e.target.dataset.i,true)};
+ if(e.target.id==='ec')shut();if(e.target.id==='exok'){shut();exportICS()}if(e.target.id==='es')saveTask(+e.target.dataset.i);if(e.target.id==='evs')saveEvent(+e.target.dataset.i);if(e.target.id==='evd')saveEvent(+e.target.dataset.i,true)};
 function editTask(i){                                                  // taak aanpassen in popup
  const t=tasks[i],f='style="width:100%;box-sizing:border-box"';
  closeMap();$('mb').innerHTML='<b>Taak aanpassen</b><div class="row" style="margin-top:8px">'
@@ -188,6 +190,12 @@ $('na').onclick=()=>{
  $('nm').textContent='"'+name+'" toegevoegd.'+(planned?' Planning bijgewerkt.':' Druk op "Plan in".');
  if(planned)$('go').onclick();};
 
+function askExport(){                                           // bevestiging als niet alles ingepland is
+ if(!unplanned){exportICS();return}
+ closeMap();$('mb').innerHTML='<b>Toch exporteren?</b><div style="margin-top:8px">Niet alle taken zijn (volledig) ingepland:</div><div class="mu" style="margin-top:4px">'+unplanned+'</div>'
+  +'<div style="margin-top:8px">De export bevat alleen wat nu in de planning staat. Weet je zeker dat je wilt exporteren?</div>'
+  +'<div style="margin-top:10px"><button class="p" id="exok">Ja, exporteren</button> <button id="ec">Annuleren</button></div>';
+ $('ov').hidden=false;}
 function exportICS(){saveFile('planning.ics',Planner.makeICS(plan,doneT),'text/calendar')}
 function saveFile(name,text,type){                             // gewone download in de browser
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;
