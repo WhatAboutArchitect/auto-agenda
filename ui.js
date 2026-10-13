@@ -223,6 +223,7 @@ $('go').onclick = async () => {
     const hm = v => v.split(':').map(Number), b = $('base').value.split(',').map(parseFloat);
     const res = await Planner.run({ events, tasks, doneT, from: new Date($('from').value + 'T00:00'), days: +$('days').value,
         ws: hm($('ws').value), we: hm($('we').value), weekend: $('wk').checked, lunchStart: hm($('ls').value), lunchMin: +$('ld').value || 0,
+        dinnerStart: hm($('ds').value), dinnerMin: +$('dd').value || 0,
         minBlock: +$('minc').value, defaultTravel: +$('buf').value, office: $('office').value.trim(), officeCoords: b.length === 2 && !b.some(isNaN) ? b : null,
         bundle: $('bun').checked, radius: +$('rad').value || 0, onStatus: t => {
             $('gs').textContent = t;

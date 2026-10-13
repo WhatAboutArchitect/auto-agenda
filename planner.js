@@ -316,6 +316,7 @@ const Planner = (() => {
         OFT = (o.office || '').toLowerCase();
         const { events, tasks, doneT } = o, start = o.from, days = o.days, end = new Date(+start + days * 864e5 + 36e5);
         const ws = o.ws, we = o.we, buf = o.defaultTravel, minc = o.minBlock, wk = o.weekend, ls = o.lunchStart, ld = o.lunchMin, bun = o.bundle, rad = o.radius;
+        const breaks = [{ name: '🍽 Lunch', start: ls, min: ld }, { name: '🍴 Avondeten', start: o.dinnerStart || [18, 30], min: o.dinnerMin || 0 }];   // vaste pauzes
         const lastEvs = events.flatMap(e => expand(e, start, end));
         const status = await prepare(lastEvs, tasks, o);
         const q = tasks.map((t, i) => {
@@ -337,12 +338,14 @@ const Planner = (() => {
             const trip = (x, y) => !x && !y ? 0 : !x ? y.tr : !y ? x.tr : (x.loc && x.loc.toLowerCase() === y.loc.toLowerCase() || x.geo && y.geo && key(x.geo) === key(y.geo) ? 0 : hop(x, y, buf));
             const pt = t => t.loc ? { loc: t.loc, tr: t.tr, geo: t.geo } : null; // plaats (null = kantoor)
             const fx = lastEvs.filter(e => +e.start >= +d && +e.start < +d + 864e5).map(e => ({ s: +e.start, e: +e.end, pl: e.tr > 0 ? { loc: e.loc || '', tr: e.tr, geo: e.geo } : null }));
-            if (ld > 0) {
+            for (const br of breaks) {
                 const l0 = new Date(d);
-                l0.setHours(ls[0], ls[1], 0, 0);
-                const l1 = new Date(+l0 + ld * 6e4);
-                lunches.push({ name: '🍽 Lunch', start: l0, end: l1, task: false });
-                fx.push({ s: +l0, e: +l1, lunch: true });
+                l0.setHours(br.start[0], br.start[1], 0, 0);
+                const l1 = new Date(+l0 + br.min * 6e4);
+                if (br.min > 0 && +l1 > +a && +l0 < +b) {              // alleen pauzes die binnen de werkuren vallen
+                    lunches.push({ name: br.name, start: l0, end: l1, task: false });
+                    fx.push({ s: +l0, e: +l1, lunch: true });
+                }
             }
             fx.sort((x, y) => x.s - y.s);
             // reistijd die na de laatste taak van een gat nog moet passen (tot de volgende afspraak of terug naar kantoor)
@@ -354,7 +357,12 @@ const Planner = (() => {
                 if (!n.lunch) {
                     return trip(pl, n.pl);
                 }
-                const o = fx[k + 1], ok = o && o.s < +b, g2 = ((ok ? o.s : +b) - n.e) / 6e4; // lunch is plaatsneutraal: de rit mag na de lunch gebeuren
+                let j = k + 1, brk = 0;                                // pauzes zijn plaatsneutraal: de rit mag na de pauze gebeuren
+                while (fx[j] && fx[j].lunch) {
+                    brk += fx[j].e - fx[j].s;
+                    j++;
+                }
+                const o = fx[j], ok = o && o.s < +b, g2 = ((ok ? o.s : +b) - n.e - brk) / 6e4;
                 return Math.max(0, trip(pl, ok ? o.pl : null) - Math.max(0, g2));
             };
             let cur = +a, at = null, le = +a; // at = plaats waar je nu bent

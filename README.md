@@ -33,7 +33,7 @@ Via de link *Voorbeeld* op de pagina download je een voorbeeldbestand.
 
 - Taken worden gesorteerd op **deadline** (met uur als dat er is), daarna op **prioriteit**. Vandaag wordt er niets ingepland vóór het huidige uur.
 - Een taak die niet in één gat past, wordt in **blokken** gesplitst (minimumlengte instelbaar), tenzij *Niet splitsen* aanstaat. Wat nergens past, staat onder *Niet ingepland*.
-- **Lunch** is een vaste pauze op elke werkdag.
+- **Lunch en avondeten** zijn vaste pauzes op elke werkdag. Het avondeten telt alleen als het binnen je werkuren valt (standaard 18:30, dus pas zichtbaar als je werkuren later eindigen).
 - **Buurt bundelen** (standaard aan): na een taak op locatie worden andere taken binnen X minuten rijden meteen meegenomen. Alleen taken zonder deadline, of met nog minstens twee dagen marge, worden naar voren gehaald. Er wordt alleen binnen één dag gebundeld.
 - Reistijd wordt gerekend van en naar je **kantoor**. Tussen twee opeenvolgende plaatsen rijd je rechtstreeks. Reistijd verschijnt als eigen blokje (🚗) in de planning.
 - Afspraken zonder locatie, of op je kantoor zelf, krijgen geen reistijd.
