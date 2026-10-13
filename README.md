@@ -21,17 +21,17 @@ Eén taak per rij. De kolomnamen mogen in hoofdletters of kleine letters staan.
 |---|---|---|
 | **Taak** | ja | Naam van de taak. Twee taken met dezelfde naam kunnen niet. |
 | **Duur (uren)** | ja | Decimalen mogen, bv. `1.5`. Staat er `min` in de kolomnaam, dan wordt het als minuten gelezen. |
-| **Deadline** | nee | Na deze dag wordt de taak niet meer ingepland. |
+| **Deadline** | nee | Datum, of datum met uur (`2026-10-16 17:00`). Zonder uur geldt de hele dag; met uur moet de taak vóór dat moment klaar zijn. |
 | **Prioriteit** | nee | `1` is het hoogst. Standaard `3`. |
 | **Locatie** | nee | Leeg = op kantoor. Anders een plaats of adres, of coördinaten zoals `51.02,4.47` (met punten). |
 | **Niet splitsen** | nee | `ja` = de taak moet in één blok passen, ook als ze langer is dan het minimumblok. |
-| **Startdatum** | nee | Niet vóór deze dag inplannen. Leeg = zo snel mogelijk. |
+| **Startdatum** | nee | Datum, of datum met uur (`2026-10-12 09:00`). De taak start niet vóór dat moment. Leeg = zo snel mogelijk. |
 
 Via de link *Voorbeeld* op de pagina download je een voorbeeldbestand.
 
 ## Hoe de planner werkt
 
-- Taken worden gesorteerd op **deadline**, daarna op **prioriteit**. Vandaag wordt er niets ingepland vóór het huidige uur.
+- Taken worden gesorteerd op **deadline** (met uur als dat er is), daarna op **prioriteit**. Vandaag wordt er niets ingepland vóór het huidige uur.
 - Een taak die niet in één gat past, wordt in **blokken** gesplitst (minimumlengte instelbaar), tenzij *Niet splitsen* aanstaat. Wat nergens past, staat onder *Niet ingepland*.
 - **Lunch** is een vaste pauze op elke werkdag.
 - **Buurt bundelen** (standaard aan): na een taak op locatie worden andere taken binnen X minuten rijden meteen meegenomen. Alleen taken zonder deadline, of met nog minstens twee dagen marge, worden naar voren gehaald. Er wordt alleen binnen één dag gebundeld.

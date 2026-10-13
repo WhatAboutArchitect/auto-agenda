@@ -2,7 +2,10 @@
    Bevat alles wat met het scherm te maken heeft: invoervelden, lijsten, popups en kaartjes.
    Alle berekeningen gebeuren in planner.js (object Planner). Dit bestand bevat zelf geen planninglogica. */
 const $ = id => document.getElementById(id);
-const { dstr, pdate, key, parseICS, parseTasks } = Planner, ll = g => [g[1], g[0]];
+const { dstr, pdate, key, parseICS, parseTasks, hasT, windowOf } = Planner, ll = g => [g[1], g[0]];
+const hhmm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+const withT = d => dstr(d) + (hasT(d) ? ' ' + hhmm(d) : '');
+const mkdt = (d, t) => d ? (t ? new Date(d + 'T' + t) : pdate(d)) : null;     // datum + optioneel uur
 let events = [], tasks = [], plan = [], lastEvs = [], lunches = [], travels = [], doneT = {}, view = [], planned = false, unplanned = '', dayMap = {}, OF = null, map = null;
 const f2 = n => String(n).padStart(2, '0');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -30,7 +33,7 @@ $('ft').onchange = async (e) => {
 };
 $('tpl').onclick = async (e) => {
     e.preventDefault();
-    const csv = 'Taak,Duur (uren),Deadline,Prioriteit,Locatie,Niet splitsen,Startdatum\nOfferte opstellen,1.5,2026-10-09,1,,ja,\nMails beantwoorden,0.75,,3,,,\nOpmeting werf,2,2026-10-16,2,Gent,ja,2026-10-12\n';
+    const csv = 'Taak,Duur (uren),Deadline,Prioriteit,Locatie,Niet splitsen,Startdatum\nOfferte opstellen,1.5,2026-10-09,1,,ja,\nMails beantwoorden,0.75,,3,,,\nOpmeting werf,2,2026-10-16 17:00,2,Gent,ja,2026-10-12 09:00\n';
     saveFile('taken-voorbeeld.csv', csv, 'text/csv');
 };
 // ---------- Kaart ----------
@@ -252,7 +255,7 @@ function render(q, start, days) {
     dayMap = map;
     let h = '';
     const left = q.filter(t => t.left > 0);
-    const lst = left.map(t => esc(t.name) + ' (' + t.left + ' min' + (t.dl ? ', deadline ' + dstr(t.dl) : '') + (t.ns ? ', niet splitsbaar – geen gat groot genoeg' : '') + ')').join(', ');
+    const lst = left.map(t => esc(t.name) + ' (' + t.left + ' min' + (t.dl ? ', deadline ' + withT(t.dl) : '') + (t.ns ? ', niet splitsbaar – geen gat groot genoeg' : '') + ')').join(', ');
     unplanned = left.length ? lst : '';
     if (left.length) {
         h += '<div class="card wa"><b>Niet (volledig) ingepland:</b> ' + lst + '<div style="margin-top:8px"><button id="ex">Exporteer planning</button></div></div>';
@@ -290,7 +293,7 @@ function detail0(x) {
         return r('Afspraak', esc(x.name || '')) + r('Tijd', tm(x.start) + ' – ' + tm(x.end)) + r('Locatie', esc(x.loc || '')) + r('Reistijd', x.tr ? x.tr + ' min enkele rit (kantoor ↔ afspraak)' : '');
     }
     const t = tasks[x.tid], ch = plan.filter(p => p.tid === x.tid).sort((a, b) => a.start - b.start), dm = doneT[x.tid];
-    return r('Taak', esc(t.name)) + r('Totale duur', fmtH(t.min)) + r('Status', dm ? 'afgewerkt ✓' : '') + r('Starten vanaf', t.sd ? f(t.sd) : 'zo snel mogelijk') + r('Deadline', t.dl ? f(t.dl) : '')
+    return r('Taak', esc(t.name)) + r('Totale duur', fmtH(t.min)) + r('Status', dm ? 'afgewerkt ✓' : '') + r('Starten vanaf', t.sd ? f(t.sd) + (hasT(t.sd) ? ' ' + hhmm(t.sd) : '') : 'zo snel mogelijk') + r('Deadline', t.dl ? f(t.dl) + (hasT(t.dl) ? ' ' + hhmm(t.dl) : '') : '')
         + r('Prioriteit', t.prio) + r('Locatie', esc(t.loc || 'kantoor')) + r('Splitsen', t.ns ? 'niet toegestaan' : 'toegestaan') + r('Reistijd ervoor', x.tr ? x.tr + ' min' : '')
         + (ch.length > 1 ? r('Alle delen', '<br>' + ch.map(p => f(p.start) + ' ' + tm(p.start) + '–' + tm(p.end) + (dm ? ' ✓' : '')).join('<br>')) : '');
 }
@@ -368,7 +371,9 @@ function editTask(i) {  // taak aanpassen in popup
         + '<label style="width:100%">Taak<input id="en" ' + f + ' value="' + esc(t.name) + '"></label>'
         + '<label>Duur (uren)<input type="number" id="ed" min="0.25" step="0.25" value="' + Math.round(t.min / 6) / 10 + '"></label>'
         + '<label>Starten vanaf (leeg = nu)<input type="date" id="esd" value="' + (t.sd ? dstr(t.sd) : '') + '"></label>'
+        + '<label>Uur<input type="time" id="est" value="' + (hasT(t.sd) ? hhmm(t.sd) : '') + '"></label>'
         + '<label>Deadline<input type="date" id="edl" value="' + (t.dl ? dstr(t.dl) : '') + '"></label>'
+        + '<label>Uur<input type="time" id="edt" value="' + (hasT(t.dl) ? hhmm(t.dl) : '') + '"></label>'
         + '<label>Prioriteit<input type="number" id="ep" min="1" max="5" value="' + t.prio + '"></label>'
         + '<label style="width:100%">Locatie (leeg = kantoor)<input id="el" list="dl" ' + f + ' value="' + esc(t.loc || '') + '"></label>'
         + '<label><span>Niet splitsen</span><input type="checkbox" id="ens"' + (t.ns ? ' checked' : '') + '></label></div>'
@@ -381,8 +386,9 @@ function saveTask(i) {
         $('em').textContent = 'Vul een naam en een duur (uren) in.';
         return;
     }
-    if ($('esd').value && $('edl').value && $('esd').value > $('edl').value) {
-        $('em').textContent = 'De startdatum ligt na de deadline.';
+    const S = mkdt($('esd').value, $('est').value), E = mkdt($('edl').value, $('edt').value);
+    if (S && E && windowOf({ sd: S, dl: E }).ts >= windowOf({ sd: S, dl: E }).te) {
+        $('em').textContent = 'Het startmoment ligt na de deadline.';
         return;
     }
     if (tasks.some((u, j) => j !== i && u.name.trim().toLowerCase() === name.toLowerCase())) {
@@ -391,7 +397,7 @@ function saveTask(i) {
     }
     const L = $('el').value.trim(), cm = L.match(/^(-?\d+\.\d+)\s*[,;]\s*(-?\d+\.\d+)$/);
     const nk0 = noteKey({ task: true, tid: i });
-    Object.assign(t, { name, min: Math.round(h * 60), sd: $('esd').value ? pdate($('esd').value) : null, dl: $('edl').value ? pdate($('edl').value) : null, prio: parseInt($('ep').value) || 3, ns: $('ens').checked });
+    Object.assign(t, { name, min: Math.round(h * 60), sd: S, dl: E, prio: parseInt($('ep').value) || 3, ns: $('ens').checked });
     const nk1 = noteKey({ task: true, tid: i });
     if (nk0 !== nk1 && NT[nk0]) {
         NT[nk1] = NT[nk0];
@@ -419,8 +425,9 @@ $('na').onclick = () => {
         $('nm').textContent = 'Vul een naam en een duur (uren) in.';
         return;
     }
-    if ($('nsd').value && $('ndl').value && $('nsd').value > $('ndl').value) {
-        $('nm').textContent = 'De startdatum ligt na de deadline.';
+    const S = mkdt($('nsd').value, $('nst').value), E = mkdt($('ndl').value, $('ndt').value);
+    if (S && E && windowOf({ sd: S, dl: E }).ts >= windowOf({ sd: S, dl: E }).te) {
+        $('nm').textContent = 'Het startmoment ligt na de deadline.';
         return;
     }
     if (tasks.some(u => u.name.trim().toLowerCase() === name.toLowerCase())) {
@@ -428,11 +435,13 @@ $('na').onclick = () => {
         return;
     }
     const L = $('nl').value.trim(), cm = L.match(/^(-?\d+\.\d+)\s*[,;]\s*(-?\d+\.\d+)$/);
-    tasks.push({ name, min: Math.round(h * 60), sd: $('nsd').value ? pdate($('nsd').value) : null, dl: $('ndl').value ? pdate($('ndl').value) : null, prio: parseInt($('np').value) || 3, loc: L, geo: cm ? [+cm[1], +cm[2]] : null, ns: $('ns').checked });
+    tasks.push({ name, min: Math.round(h * 60), sd: S, dl: E, prio: parseInt($('np').value) || 3, loc: L, geo: cm ? [+cm[1], +cm[2]] : null, ns: $('ns').checked });
     $('nn').value = '';
     $('nl').value = '';
     $('ndl').value = '';
+    $('ndt').value = '';
     $('nsd').value = '';
+    $('nst').value = '';
     $('ns').checked = false;
     $('st').textContent = tasks.length + ' taken, samen ' + Math.round(tasks.reduce((a, t) => a + t.min, 0) / 6) / 10 + ' uur.';
     $('nm').textContent = '"' + name + '" toegevoegd.' + (planned ? ' Planning bijgewerkt.' : ' Druk op "Plan in".');

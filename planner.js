@@ -120,6 +120,37 @@ const Planner = (() => {
         return out;
     }
     // ---------- Taken ----------
+    function pdt(v) {                                          // datum met optioneel uur: '2026-10-12 14:00' of '12/10/2026 14:00'
+        if (!v) {
+            return null;
+        }
+        if (v instanceof Date) {
+            if (isNaN(v)) {
+                return null;
+            }
+            const t = new Date(Math.round(+v / 6e4) * 6e4), mins = t.getHours() * 60 + t.getMinutes();
+            if (mins <= 5 || mins >= 1435) {                       // Excel-datum zonder uur: afronden op middernacht
+                return new Date(t.getFullYear(), t.getMonth(), t.getDate() + (mins >= 1435 ? 1 : 0));
+            }
+            return t;
+        }
+        const s = String(v).trim();
+        let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[ T]+(\d{1,2})[:.hu](\d{2}))?$/i);
+        if (m) {
+            return new Date(+m[3], m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+        }
+        m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T]+(\d{1,2})[:.hu](\d{2}))?$/i);
+        if (m) {
+            return new Date(+m[1], m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
+        }
+        const d = new Date(s);
+        return isNaN(d) ? null : d;
+    }
+    const hasT = d => !!d && (d.getHours() > 0 || d.getMinutes() > 0);          // heeft de datum een uur? (00:00 = hele dag)
+    const windowOf = t => ({                                   // ts = niet vóór dit moment, te = klaar vóór dit moment
+        ts: t.sd ? +t.sd : 0,
+        te: t.dl ? (hasT(t.dl) ? +t.dl : +new Date(t.dl.getFullYear(), t.dl.getMonth(), t.dl.getDate() + 1)) : 9e15
+    });
     function pdate(v) {
         if (!v) {
             return null;
@@ -155,7 +186,7 @@ const Planner = (() => {
                 return null;
             }
             const L = String(lc.v || '').trim(), cm = L.match(/^(-?\d+\.\d+)\s*[,;]\s*(-?\d+\.\d+)$/);
-            return { name: String(n.v), min: Math.round(min), dl: pdate(dl.v), prio: parseInt(p.v) || 3, loc: L, geo: cm ? [+cm[1], +cm[2]] : null, sd: pdate(sc.v), ns: /^(ja|j|yes|y|x|1|true|waar|✓)$/i.test(String(sp.v || '').trim()) };
+            return { name: String(n.v), min: Math.round(min), dl: pdt(dl.v), prio: parseInt(p.v) || 3, loc: L, geo: cm ? [+cm[1], +cm[2]] : null, sd: pdt(sc.v), ns: /^(ja|j|yes|y|x|1|true|waar|✓)$/i.test(String(sp.v || '').trim()) };
         }).filter(Boolean);
     }
     // ---------- Reistijd ----------
@@ -289,9 +320,9 @@ const Planner = (() => {
         const status = await prepare(lastEvs, tasks, o);
         const q = tasks.map((t, i) => {
             const onsite = !t.loc || (OFT && t.loc.toLowerCase().includes(OFT));
-            return { ...t, loc: onsite ? null : t.loc, tr: onsite ? 0 : travel(t, buf), left: doneT[i] ? 0 : t.min, tid: i };
+            return { ...t, loc: onsite ? null : t.loc, tr: onsite ? 0 : travel(t, buf), left: doneT[i] ? 0 : t.min, tid: i, ...windowOf(t) };
         })
-            .sort((a, b) => (a.dl ? +a.dl : 9e15) - (b.dl ? +b.dl : 9e15) || a.prio - b.prio || String(a.loc).localeCompare(String(b.loc)));
+            .sort((a, b) => a.te - b.te || a.prio - b.prio || String(a.loc).localeCompare(String(b.loc)));
         lastEvs.forEach(e => e.tr = travel(e, buf));
         const plan = [], lunches = [], travels = [];
         for (let i = 0; i < days; i++) {
@@ -336,20 +367,15 @@ const Planner = (() => {
                         if (t.left <= 0) {
                             return false;
                         }
-                        if (t.sd && +d < +t.sd) {
-                            return false;
-                        } // nog niet starten
-                        if (t.dl && +d > +t.dl) {
-                            return false;
-                        } // na de deadline: niet meer inplannen
                         const L = pt(t), pre = trip(at, L), post = need(k, L);
-                        const room = Math.floor((ge - p) / 6e4) - pre - post;
+                        const s = Math.max(p + pre * 6e4, t.ts);       // niet vóór het startmoment
+                        const room = Math.min(Math.floor((ge - s) / 6e4) - post, Math.floor((t.te - s) / 6e4));   // wel klaar vóór het deadlinemoment
                         if (room <= 0 || (t.ns ? room < t.left : (room < minc && room < t.left))) {
                             return false;
                         } // 'niet splitsen': alles of niets
-                        const m = Math.min(room, t.left), s = p + pre * 6e4;
+                        const m = Math.min(room, t.left);
                         if (pre > 0) {
-                            travels.push({ name: '🚗 Reis naar ' + (L ? L.loc.split(',')[0] : 'kantoor'), start: new Date(p), end: new Date(p + pre * 6e4), travel: true, task: false });
+                            travels.push({ name: '🚗 Reis naar ' + (L ? L.loc.split(',')[0] : 'kantoor'), start: new Date(s - pre * 6e4), end: new Date(s), travel: true, task: false });
                         }
                         plan.push({ geo: t.geo, fr: at ? at.geo : OF, name: t.name, start: new Date(s), end: new Date(s + m * 6e4), task: true, loc: t.loc, tr: pre, tid: t.tid });
                         p = s + m * 6e4;
@@ -363,7 +389,7 @@ const Planner = (() => {
                     const pull = () => {
                         if (bun && at) {
                             for (const t of q) {
-                                if (t.loc && t.left > 0 && !(t.dl && +t.dl - +d < 1.9 * 864e5) && trip(at, pt(t)) <= rad) {
+                                if (t.loc && t.left > 0 && !(t.te - +d < 2.9 * 864e5) && trip(at, pt(t)) <= rad) {
                                     tryPlace(t);
                                 }
                             }
@@ -414,5 +440,5 @@ const Planner = (() => {
         });
         return { list: out, dropped: list.length - out.length };
     }
-    return { dstr, key, pdate, parseICS, parseTasks, uniqueTasks, run, makeICS, suggest, route };
+    return { dstr, key, pdate, pdt, hasT, windowOf, parseICS, parseTasks, uniqueTasks, run, makeICS, suggest, route };
 })();

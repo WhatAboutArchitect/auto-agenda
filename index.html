@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Auto-agenda</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -14,12 +14,14 @@
 <div class="mu" id="si">Apple Agenda → Archief → Exporteer → Exporteer… geeft een .ics-bestand.</div></div>
 <div class="card"><h2>2. Takenlijst (.xlsx of .csv)</h2>
 <input type="file" id="ft" accept=".xlsx,.xls,.csv">
-<div class="mu" id="st">Kolommen: Taak, Duur (uren, bv. 1,5), optioneel Deadline, Prioriteit (1 = hoogst), Locatie (leeg = op kantoor), Niet splitsen (ja = in één blok) en Startdatum (leeg = zo snel mogelijk). <a href="#" id="tpl">Voorbeeld</a></div></div>
+<div class="mu" id="st">Kolommen: Taak, Duur (uren, bv. 1,5), optioneel Deadline, Prioriteit (1 = hoogst), Locatie (leeg = op kantoor), Niet splitsen (ja = in één blok) en Startdatum (leeg = zo snel mogelijk). Bij Deadline en Startdatum mag je ook een uur zetten, bv. 2026-10-12 14:00. <a href="#" id="tpl">Voorbeeld</a></div></div>
 <div class="card"><h2>Extra taak toevoegen (optioneel)</h2><div class="row">
 <label>Taak<input id="nn" style="width:170px"></label>
 <label>Duur (uren)<input type="number" id="nd" value="1" min="0.25" step="0.25"></label>
 <label>Starten vanaf (leeg = nu)<input type="date" id="nsd"></label>
+<label>Uur<input type="time" id="nst"></label>
 <label>Deadline<input type="date" id="ndl"></label>
+<label>Uur<input type="time" id="ndt"></label>
 <label>Prioriteit (1 = hoogst)<input type="number" id="np" value="3" min="1" max="5"></label>
 <label>Locatie (leeg = kantoor)<input id="nl" list="dl" style="width:190px"></label><datalist id="dl"></datalist>
 <label><span>Niet splitsen</span><input type="checkbox" id="ns"></label>
@@ -46,7 +48,7 @@
 <div id="out"></div>
 </main>
 <div id="ov" hidden><div class="mod"><button class="x" id="cl">✕</button><div id="mb"></div></div></div>
-<div class="mu" style="text-align:center;padding:12px 0">Versie 7</div>
-<script src="planner.js?v=7"></script>
-<script src="ui.js?v=7"></script>
+<div class="mu" style="text-align:center;padding:12px 0">Versie 8</div>
+<script src="planner.js?v=8"></script>
+<script src="ui.js?v=8"></script>
 </body></html>
