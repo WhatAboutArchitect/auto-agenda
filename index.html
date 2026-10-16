@@ -9,13 +9,16 @@
 </head>
 <body><main>
 <h1>📅 Auto-agenda</h1>
+  
 <div class="card"><h2>1. Vaste afspraken (.ics)</h2>
 <input type="file" id="fi" accept=".ics,text/calendar">
 <div class="mu" id="si">Apple Agenda → Archief → Exporteer → Exporteer… geeft een .ics-bestand.</div></div>
+  
 <div class="card"><h2>2. Takenlijst (.xlsx of .csv)</h2>
 <input type="file" id="ft" accept=".xlsx,.xls,.csv">
 <div class="mu" id="st">Kolommen: Taak, Duur (uren, bv. 1,5), optioneel Deadline, Prioriteit (1 = hoogst), Locatie (leeg = op kantoor), Niet splitsen (ja = in één blok) en Startdatum (leeg = zo snel mogelijk). Bij Deadline en Startdatum mag je ook een uur zetten, bv. 2026-10-12 14:00. <a href="#" id="tpl">Voorbeeld</a></div></div>
-<div class="card"><h2>Extra taak toevoegen (optioneel)</h2><div class="row">
+
+ <div class="card"><h2>Extra taak toevoegen (optioneel)</h2><div class="row">
 <label>Taak<input id="nn" style="width:170px"></label>
 <label>Duur (uren)<input type="number" id="nd" value="1" min="0.25" step="0.25"></label>
 <label>Starten vanaf (leeg = nu)<input type="date" id="nsd"></label>
@@ -26,6 +29,7 @@
 <label>Locatie (leeg = kantoor)<input id="nl" list="dl" style="width:190px"></label><datalist id="dl"></datalist>
 <label><span>Niet splitsen</span><input type="checkbox" id="ns"></label>
 <button id="na">Toevoegen</button></div><div class="mu" id="nm" style="margin-top:6px"></div></div>
+
 <div class="card"><h2>3. Pauzes en reistijd</h2><div class="row">
 <label>Lunch vanaf<input type="time" id="ls" value="12:00"></label>
 <label>Duur (min, 0 = geen)<input type="number" id="ld" value="45" min="0"></label>
@@ -35,6 +39,7 @@
 <label>Coördinaten kantoor (optioneel)<input id="base" placeholder="51.0259,4.4776" style="width:160px"></label></div>
 
 <div class="mu" style="margin-top:6px">Locaties worden via OpenStreetMap (Nominatim) opgezocht en de rijtijden tussen alle plaatsen met OSRM berekend (auto, zonder file). Vertrek en terugkeer gebeuren vanuit je kantoor; tussen twee plaatsen rijd je rechtstreeks. Lukt de berekening of het opzoeken van een adres niet, dan wordt de standaardreistijd gebruikt. Afspraken zonder locatie krijgen geen reistijd.</div></div>
+
 <div class="card"><h2>4. Werkuren en plannen</h2><div class="row">
 <label>Vanaf<input type="date" id="from"></label>
 <label>Dagen<input type="number" id="days" value="14" min="1" max="90"></label>
@@ -48,6 +53,7 @@
 <button class="p" id="go">Plan in</button></div></div>
 <div class="mu" id="gs"></div>
 <div id="out"></div>
+
 </main>
 <div id="ov" hidden><div class="mod"><button class="x" id="cl">✕</button><div id="mb"></div></div></div>
 <div class="mu" style="text-align:center;padding:12px 0">Versie 9</div>
